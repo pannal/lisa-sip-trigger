@@ -1,0 +1,28 @@
+services:
+  lisa-sip-trigger:
+    # Set LISA_IMAGE to the maintainer's published Docker Hub image.
+    image: ${LISA_IMAGE:?Set LISA_IMAGE in .env to the published Docker Hub image}
+    container_name: lisa-sip-trigger
+    restart: unless-stopped
+    network_mode: host
+    stop_grace_period: 15s
+    environment:
+      # Historical SPA_* configuration remains supported.
+      ATA_HOST: ${ATA_HOST-${SPA_HOST:?Set ATA_HOST (or legacy SPA_HOST) in .env}}
+      ATA_PORT: ${ATA_PORT-${SPA_PORT:-5061}}
+      ATA_USER: ${ATA_USER-${SPA_USER:-lisa}}
+      RING_SECONDS: ${RING_SECONDS:-2}
+      RETRIGGER_INTERVAL: ${RETRIGGER_INTERVAL:-32}
+      MAX_ALARM_SECONDS: ${MAX_ALARM_SECONDS:-1800}
+      ERROR_RETRY_SECONDS: ${ERROR_RETRY_SECONDS:-5}
+      HTTP_BIND: ${HTTP_BIND:-0.0.0.0}
+      HTTP_PORT: ${HTTP_PORT:-18080}
+      API_TOKEN: ${API_TOKEN:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

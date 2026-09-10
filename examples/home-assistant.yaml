@@ -1,0 +1,49 @@
+# Merge these sections into configuration.yaml, or load this file as a package.
+# Replace LISA_TRIGGER_HOST with the service host's address.
+# Replace binary_sensor.alarm_active with your alarm's active/acknowledged state.
+rest_command:
+  lisa_alarm_start:
+    url: "http://LISA_TRIGGER_HOST:18080/alarm/start"
+    method: POST
+    timeout: 5
+    # If API_TOKEN is enabled, uncomment these lines in BOTH REST commands:
+    # headers:
+    #   X-API-Key: !secret lisa_trigger_api_token
+
+  lisa_alarm_stop:
+    url: "http://LISA_TRIGGER_HOST:18080/alarm/stop"
+    method: POST
+    timeout: 5
+    # headers:
+    #   X-API-Key: !secret lisa_trigger_api_token
+
+# Map acknowledgement to the inactive state (off) of your chosen entity.
+# A queued automation preserves START/STOP order when states change rapidly.
+automation:
+  - alias: "Synchronize LISA alarm"
+    id: lisa_alarm_sync
+    mode: queued
+    triggers:
+      - trigger: state
+        entity_id: binary_sensor.alarm_active
+        to: "on"
+      - trigger: state
+        entity_id: binary_sensor.alarm_active
+        to: "off"
+      - trigger: homeassistant
+        event: start
+    actions:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: binary_sensor.alarm_active
+                state: "on"
+            sequence:
+              - action: rest_command.lisa_alarm_start
+          - conditions:
+              - condition: state
+                entity_id: binary_sensor.alarm_active
+                state: "off"
+            sequence:
+              - action: rest_command.lisa_alarm_stop
+        # unknown/unavailable is not treated as an acknowledgement.

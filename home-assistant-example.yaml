@@ -1,0 +1,3 @@
+# The maintained, generic Home Assistant example has moved to:
+# examples/home-assistant.yaml
+# Merge that file into configuration.yaml or load it as a package.
