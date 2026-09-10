@@ -474,7 +474,9 @@ class HttpTests(unittest.TestCase):
                             return True
                     except OSError:
                         return False
-                wait_until(ready)
+                # Interpreter startup under ARM emulation can take several
+                # seconds. The SIGTERM cleanup deadline below stays strict.
+                wait_until(ready, timeout=15)
                 conn = http.client.HTTPConnection("127.0.0.1", port, timeout=2)
                 conn.request("POST", "/alarm/start")
                 response = conn.getresponse()
