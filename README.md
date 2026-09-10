@@ -301,7 +301,16 @@ Before publishing:
 6. After approval, push a stable `vX.Y.Z` Git tag to trigger the release workflow.
 
 Pull requests and branch pushes run tests and build containers, with **no registry
-login or publishing**. Stable release tags publish the major, minor, full version,
+login or publishing**. They also retain a multi-platform OCI image archive for
+14 days as the `lisa-sip-trigger-oci` Actions artifact. Download it from the run's
+Artifacts section or with the GitHub CLI; no local Docker installation is needed
+to obtain the built image:
+
+```bash
+gh run download RUN_ID --repo pannal/lisa-sip-trigger --name lisa-sip-trigger-oci
+```
+
+Stable release tags publish the major, minor, full version,
 `latest`, and `sha-<shortsha>` tags. For example, `v1.2.3` publishes `1`, `1.2`,
 `1.2.3`, `latest`, and a SHA tag. Prerelease/malformed tags are rejected. There is
 no automatic edge publication or second registry. Publishing an older version

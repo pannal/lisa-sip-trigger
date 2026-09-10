@@ -83,7 +83,17 @@ jobs:
           target: runtime
           platforms: linux/amd64,linux/arm64
           push: ${{ startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' }}
+          outputs: ${{ !startsWith(github.ref, 'refs/tags/') && format('type=oci,dest={0}/lisa-sip-trigger.oci.tar', runner.temp) || '' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=lisa-runtime
           cache-to: type=gha,mode=max,scope=lisa-runtime
+      - name: Save image archive for review
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: lisa-sip-trigger-oci
+          path: ${{ runner.temp }}/lisa-sip-trigger.oci.tar
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
