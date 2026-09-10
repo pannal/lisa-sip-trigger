@@ -324,7 +324,7 @@ no automatic edge publication or second registry. Publishing an older version
 also updates `latest`; release only the intended current stable version through
 this workflow. Use protected tags to control who can trigger publication.
 
-To pin this release, set `LISA_IMAGE=pannal/lisa-sip-trigger:0.1.1` in `.env`
+To pin this release, set `LISA_IMAGE=pannal/lisa-sip-trigger:0.1.2` in `.env`
 instead of `latest`. Version tags are conventional tags, not enforced immutable
 references; pin an image digest when exact content identity is required.
 
