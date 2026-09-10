@@ -26,9 +26,25 @@ jobs:
     needs: tests
     runs-on: ubuntu-latest
     env:
-      IMAGE: ${{ vars.DOCKERHUB_IMAGE || 'dockerhub-user/lisa-sip-trigger' }}
+      IMAGE: ${{ vars.DOCKERHUB_IMAGE || 'pannal/lisa-sip-trigger' }}
     steps:
       - uses: actions/checkout@v6
+      - name: Select registry publishing or local archive
+        id: publishing
+        env:
+          RELEASE_PUSH: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import os
+          release = os.environ['RELEASE_PUSH'] == 'true'
+          configured = bool(os.environ['DOCKERHUB_USERNAME'] and os.environ['DOCKERHUB_TOKEN'])
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              print(f'enabled={str(release and configured).lower()}', file=output)
+          if release and not configured:
+              print('Docker Hub CI credentials are absent; exporting the release image for local publication.')
+          PY
       - name: Validate release configuration
         if: startsWith(github.ref, 'refs/tags/')
         env:
@@ -40,7 +56,7 @@ jobs:
           if not re.fullmatch(r'v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', tag):
               raise SystemExit('Only stable vX.Y.Z releases are supported')
           image = os.environ['IMAGE']
-          if image.startswith('dockerhub-user/') or not re.fullmatch(r'[a-z0-9_-]+/[a-z0-9._-]+', image):
+          if not re.fullmatch(r'[a-z0-9_-]+/[a-z0-9._-]+', image):
               raise SystemExit('Set the DOCKERHUB_IMAGE repository variable to namespace/lisa-sip-trigger')
           PY
       - uses: docker/setup-qemu-action@v4
@@ -71,7 +87,7 @@ jobs:
             org.opencontainers.image.description=Trigger legacy Humantechnik LISA radio alerts through a SIP FXS adapter
             org.opencontainers.image.licenses=MIT
       - name: Log in to Docker Hub for releases only
-        if: startsWith(github.ref, 'refs/tags/') && github.event_name == 'push'
+        if: steps.publishing.outputs.enabled == 'true'
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -82,14 +98,14 @@ jobs:
           context: .
           target: runtime
           platforms: linux/amd64,linux/arm64
-          push: ${{ startsWith(github.ref, 'refs/tags/') && github.event_name == 'push' }}
-          outputs: ${{ !startsWith(github.ref, 'refs/tags/') && format('type=oci,dest={0}/lisa-sip-trigger.oci.tar', runner.temp) || '' }}
+          push: ${{ steps.publishing.outputs.enabled == 'true' }}
+          outputs: ${{ steps.publishing.outputs.enabled != 'true' && format('type=oci,dest={0}/lisa-sip-trigger.oci.tar', runner.temp) || '' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=lisa-runtime
           cache-to: type=gha,mode=max,scope=lisa-runtime
       - name: Save image archive for review
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        if: steps.publishing.outputs.enabled != 'true'
         uses: actions/upload-artifact@v7
         with:
           name: lisa-sip-trigger-oci

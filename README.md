@@ -78,20 +78,19 @@ Use a native Linux Docker host on the ATA's LAN with Docker Compose installed.
 The default Compose file pulls a **prebuilt Docker Hub image**; no local build,
 compiler, or Buildx setup is needed by users.
 
-**Before the first public release:** `dockerhub-user/lisa-sip-trigger` is a
-placeholder, not an available image promised by this repository. The maintainer
-must publish under the real namespace and update the example as described below.
+Image: [`pannal/lisa-sip-trigger`](https://hub.docker.com/r/pannal/lisa-sip-trigger).
+Use `latest` or pin a released version such as `0.1.0`.
 
 ```bash
 cp .env.example .env
-# Edit .env: set LISA_IMAGE to the published image and ATA_HOST to your ATA.
+# Edit .env: set ATA_HOST to your ATA and optionally set API_TOKEN.
 docker compose up -d
 ```
 
-Example settings (replace the placeholders):
+Example settings (replace the documentation ATA address):
 
 ```dotenv
-LISA_IMAGE=dockerhub-user/lisa-sip-trigger:latest
+LISA_IMAGE=pannal/lisa-sip-trigger:latest
 ATA_HOST=192.0.2.10
 ATA_PORT=5061
 ATA_USER=lisa
@@ -224,7 +223,7 @@ if your setup requires that. See the official
 | API returns `401` | Check `.env` token, header spelling, and Home Assistant secret. Recreate the container after configuration changes. |
 | Container exits/restarts | Read startup logs for missing host, malformed port, invalid durations, or an occupied HTTP port. |
 | Container is unhealthy | Inspect health output with `docker inspect lisa-sip-trigger`; check `HTTP_BIND`, `HTTP_PORT`, and `/health` from the host. The image's health check uses the configured bind/port and needs no token. |
-| Image pull fails | Replace the namespace placeholder, confirm the release exists and is public, and check registry connectivity. |
+| Image pull fails | Confirm the selected tag exists under `pannal/lisa-sip-trigger` and check registry connectivity. |
 
 ## Security and limitations
 
@@ -280,7 +279,7 @@ docker buildx build --platform linux/amd64,linux/arm64 --target runtime .
 
 Source repository: [pannal/lisa-sip-trigger](https://github.com/pannal/lisa-sip-trigger).
 
-Primary image: **`dockerhub-user/lisa-sip-trigger` (placeholder)**. The workflow
+Primary image: **`pannal/lisa-sip-trigger`** on Docker Hub. The workflow
 builds for `linux/amd64` and `linux/arm64`, using Buildx and GitHub Actions layer
 caching. It runs the tests inside each architecture's Python container as well as
 on Python 3.12 and 3.13 on the runner. Actual hardware compatibility is separate
@@ -288,14 +287,17 @@ from CPU architecture support.
 
 Before publishing:
 
-1. Choose a Docker Hub namespace and create a public `lisa-sip-trigger` repository.
-2. Set the GitHub repository variable `DOCKERHUB_IMAGE` to
-   `your-namespace/lisa-sip-trigger` (no tag or registry prefix).
-3. Set repository secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`; the token must
+1. Use the public Docker Hub repository `pannal/lisa-sip-trigger`.
+2. To publish a fork elsewhere, set the GitHub repository variable `DOCKERHUB_IMAGE`
+   to its `namespace/repository` (no tag or registry prefix).
+3. For automatic CI publication, set repository secrets `DOCKERHUB_USERNAME` and
+   `DOCKERHUB_TOKEN`; the token must
    have permission to push that image. The username may differ from an organization
-   namespace.
-4. Replace the image placeholder in `.env.example` and this README with the real
-   image name. Compose reads `LISA_IMAGE` from `.env`.
+   namespace. Alternatively, leave these secrets unset and publish the built OCI
+   archive with a locally authenticated registry client. The tag workflow still
+   runs tests and builds both architectures, then exports the release archive.
+4. If changing the image name, update `.env.example` and this README too.
+   Compose reads `LISA_IMAGE` from `.env`.
 5. Review changes, local tests/builds, and the hardware cancellation behavior.
    Obtain explicit approval before any push, release, or image publication.
 6. After approval, push a stable `vX.Y.Z` Git tag to trigger the release workflow.
@@ -310,14 +312,14 @@ to obtain the built image:
 gh run download RUN_ID --repo pannal/lisa-sip-trigger --name lisa-sip-trigger-oci
 ```
 
-Stable release tags publish the major, minor, full version,
+With CI credentials configured, stable release tags publish the major, minor, full version,
 `latest`, and `sha-<shortsha>` tags. For example, `v1.2.3` publishes `1`, `1.2`,
 `1.2.3`, `latest`, and a SHA tag. Prerelease/malformed tags are rejected. There is
 no automatic edge publication or second registry. Publishing an older version
 also updates `latest`; release only the intended current stable version through
 this workflow. Use protected tags to control who can trigger publication.
 
-To pin a release, set `LISA_IMAGE=your-namespace/lisa-sip-trigger:1.2.3` in `.env`
+To pin the first release, set `LISA_IMAGE=pannal/lisa-sip-trigger:0.1.0` in `.env`
 instead of `latest`. Version tags are conventional tags, not enforced immutable
 references; pin an image digest when exact content identity is required.
 
