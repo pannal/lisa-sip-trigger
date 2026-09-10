@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python: ['3.12', '3.13']
+        python: ['3.12', '3.13', '3.14']
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -43,7 +43,12 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               print(f'enabled={str(release and configured).lower()}', file=output)
           if release and not configured:
-              print('Docker Hub CI credentials are absent; exporting the release image for local publication.')
+              print('::warning::Docker Hub publication skipped: DOCKERHUB_USERNAME and/or '
+                    'DOCKERHUB_TOKEN is missing. Building a downloadable OCI archive only.')
+          elif release:
+              print('Docker Hub credentials configured; this release will be published after tests and build succeed.')
+          else:
+              print('Pull request or branch build: no Docker Hub login or push; exporting an OCI archive.')
           PY
       - name: Validate release configuration
         if: startsWith(github.ref, 'refs/tags/')
@@ -113,3 +118,21 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
+      - name: Report image result
+        env:
+          PUBLISHED: ${{ steps.publishing.outputs.enabled }}
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          python3 - <<'PY'
+          import os
+          if os.environ['PUBLISHED'] == 'true':
+              result = 'Published the linux/amd64 and linux/arm64 image to Docker Hub.'
+          else:
+              result = ('Docker Hub image NOT published. The linux/amd64 and linux/arm64 '
+                        'OCI archive is available as the lisa-sip-trigger-oci artifact for 14 days.')
+          print(result)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              print(result, file=summary)
+              print('\nGenerated image tags (pushed only when published):\n', file=summary)
+              print('```\n' + os.environ['IMAGE_TAGS'] + '\n```', file=summary)
+          PY

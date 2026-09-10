@@ -294,7 +294,7 @@ class SipCall:
                         continue
                     if 100 <= code < 200:
                         self.got_provisional = True
-                    if code in (180, 183):
+                    if code == 180:
                         ringing = True
                         log.info("ATA is ringing")
                         break
@@ -315,7 +315,7 @@ class SipCall:
                 self.cancel()
                 if self.stop_event.is_set():
                     return False
-                raise RuntimeError("No 180 Ringing / 183 response from ATA")
+                raise RuntimeError("No 180 Ringing response from ATA")
 
             ring_deadline = time.monotonic() + ring_seconds
             while not self.stop_event.is_set() and time.monotonic() < ring_deadline:

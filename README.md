@@ -34,7 +34,10 @@ Home Assistant / HTTP client
 ```
 
 START launches a background loop. Each cycle sends an INVITE, waits for
-`180 Ringing` (or `183`), rings for two seconds by default, and sends CANCEL.
+`180 Ringing`, rings for two seconds by default, and sends CANCEL.
+`183 Session Progress` and other provisional responses do not confirm ringing;
+the service keeps waiting for `180`. If no `180` arrives before the setup timeout,
+the attempt fails and the service sends CANCEL if it received a provisional response.
 The normal completion is `200 OK` for CANCEL, `487 Request Terminated` for
 INVITE, and an ACK for that INVITE response. The next cycle starts 32 seconds
 after the previous cycle started. Failed attempts retry after five seconds.
@@ -212,7 +215,7 @@ if your setup requires that. See the official
 | Symptom | Check |
 | --- | --- |
 | No SIP response / setup timeout | Verify `ATA_HOST`, network reachability, UDP firewall rules, and the actual Line 2 `SIP Port`. ICMP ping alone does not prove SIP works. |
-| No `180 Ringing` / `183` | Confirm Line Enable=`yes`, Register=`no`, Ans Call Without Reg=`yes`, User ID matches, and the A-2463-0 is on PHONE 2. |
+| No `180 Ringing` (even if `183` arrives) | Confirm Line Enable=`yes`, Register=`no`, Ans Call Without Reg=`yes`, User ID matches, and the A-2463-0 is on PHONE 2. |
 | ATA ignores INVITE | Check `Restrict Source IP` and `Auth INVITE`; use the initial test settings above on a trusted LAN. |
 | ATA returns `4xx` / `5xx` | Read the status code in logs and `last_error`; check user, authentication restrictions, busy line, and ATA configuration. Rejected INVITEs are acknowledged and retried after the error delay. |
 | Works outside Docker only | Use native Linux host networking; check host firewall rules and the source/Via address in DEBUG logs. Bridged Docker NAT is not the tested path. |
@@ -246,8 +249,8 @@ No software check can prove that the transmitter, radio link, or receiver worked
 
 ## Development and verification
 
-Python 3.12+ is supported; the container uses `python:3.13-alpine`. Only the standard
-library is needed:
+Python 3.12+ is supported; CI tests Python 3.12, 3.13 and 3.14. The container uses
+`python:3.13-alpine`. Only the standard library is needed:
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -282,7 +285,7 @@ Source repository: [pannal/lisa-sip-trigger](https://github.com/pannal/lisa-sip-
 Primary image: **`pannal/lisa-sip-trigger`** on Docker Hub. The workflow
 builds for `linux/amd64` and `linux/arm64`, using Buildx and GitHub Actions layer
 caching. It runs the tests inside each architecture's Python container as well as
-on Python 3.12 and 3.13 on the runner. Actual hardware compatibility is separate
+on Python 3.12, 3.13 and 3.14 on the runner. Actual hardware compatibility is separate
 from CPU architecture support.
 
 Before publishing:
@@ -296,6 +299,8 @@ Before publishing:
    namespace. Alternatively, leave these secrets unset and publish the built OCI
    archive with a locally authenticated registry client. The tag workflow still
    runs tests and builds both architectures, then exports the release archive.
+   Missing credentials produce a workflow warning; the run summary explicitly
+   states that the Docker Hub image was not published and points to the archive.
 4. If changing the image name, update `.env.example` and this README too.
    Compose reads `LISA_IMAGE` from `.env`.
 5. Review changes, local tests/builds, and the hardware cancellation behavior.

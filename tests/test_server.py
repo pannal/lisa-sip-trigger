@@ -200,14 +200,44 @@ class SipTests(unittest.TestCase):
                 self.call(ata).ring(0.05)
 
     def test_provisional_without_ringing_is_cancelled_on_timeout(self):
-        def trying_only(ata, msg, peer):
+        for status in ("100 Trying", "182 Queued", "183 Session Progress"):
+            with self.subTest(status=status):
+                def provisional_only(ata, msg, peer):
+                    if msg.startswith("INVITE "):
+                        ata.response(msg, peer, status)
+                    else:
+                        FakeATA.normal(ata, msg, peer)
+                with FakeATA(provisional_only) as ata, configured(ata, INVITE_TIMEOUT=0.3):
+                    call = self.call(ata)
+                    started = time.monotonic()
+                    with self.assertRaisesRegex(RuntimeError, "No 180 Ringing"):
+                        call.ring(0.05)
+                    self.assertGreaterEqual(time.monotonic() - started, 0.3)
+                    self.assert_transaction(ata)
+                    self.assertEqual(ata.methods().count("INVITE"), 1)
+                    self.assertEqual(call.sock.fileno(), -1)
+
+    def test_session_progress_then_ringing(self):
+        def progress_then_ring(ata, msg, peer):
             if msg.startswith("INVITE "):
-                ata.response(msg, peer, "100 Trying")
+                ata.response(msg, peer, "183 Session Progress")
+                time.sleep(0.1)
+            FakeATA.normal(ata, msg, peer)
+        with FakeATA(progress_then_ring) as ata, configured(ata):
+            self.assertTrue(self.call(ata).ring(0.05))
+            self.assert_transaction(ata)
+            self.assertEqual(ata.methods().count("INVITE"), 1)
+
+    def test_stop_after_session_progress_without_ringing(self):
+        stop = threading.Event()
+        def progress_then_stop(ata, msg, peer):
+            if msg.startswith("INVITE "):
+                ata.response(msg, peer, "183 Session Progress")
+                stop.set()
             else:
                 FakeATA.normal(ata, msg, peer)
-        with FakeATA(trying_only) as ata, configured(ata, INVITE_TIMEOUT=0.3):
-            with self.assertRaisesRegex(RuntimeError, "No 180"):
-                self.call(ata).ring(0.05)
+        with FakeATA(progress_then_stop) as ata, configured(ata):
+            self.assertFalse(self.call(ata, stop).ring(10))
             self.assert_transaction(ata)
 
     def test_final_before_cancel_ok(self):
